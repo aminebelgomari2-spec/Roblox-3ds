@@ -1,0 +1,56 @@
+name: Build Roblox 3DS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les outils
+        run: |
+          apt-get update && apt-get install -y wget unzip qrencode python3 python3-pil fonts-dejavu-core
+          wget -q https://github.com/diasurgical/bannertool/releases/download/1.2.0/bannertool.zip
+          unzip -j bannertool.zip "linux-x86_64/bannertool" -d /opt/devkitpro/tools/bin
+          wget -q https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18/makerom-v0.18-ubuntu_x86_64.zip
+          unzip -o makerom-v0.18-ubuntu_x86_64.zip makerom -d /opt/devkitpro/tools/bin
+          chmod a+x /opt/devkitpro/tools/bin/makerom /opt/devkitpro/tools/bin/bannertool
+
+      - name: Generer icone, banniere et son
+        run: python3 tools/make_assets.py
+
+      - name: Compiler le .3dsx
+        run: make
+
+      - name: Creer le .cia
+        run: make cia
+
+      - name: Generer le QR code
+        run: qrencode -o qr-install.png -s 10 "https://github.com/${{ github.repository }}/releases/download/latest/roblox3ds.cia"
+
+      - name: Sauvegarder les fichiers
+        uses: actions/upload-artifact@v4
+        with:
+          name: roblox3ds
+          path: |
+            roblox3ds.3dsx
+            roblox3ds.cia
+            qr-install.png
+
+      - name: Publier dans les Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Derniere version
+          files: |
+            roblox3ds.3dsx
+            roblox3ds.cia
+            qr-install.png
